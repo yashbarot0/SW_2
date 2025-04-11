@@ -56,36 +56,39 @@ void write_grid(double **grid, int y_start, int local_ny, int nx, const char *fi
 void GatherGrid(double **local_grid, int local_ny, int nx, int rank, int nprocs, MPI_Comm comm, double **global_grid) {
     // Gather local_ny from all processes
     int *local_ny_all = NULL;
+    int *recvcounts = NULL;
     int *displs = NULL;
     if (rank == 0) {
         local_ny_all = (int *)malloc(nprocs * sizeof(int));
+        recvcounts = (int *)malloc(nprocs * sizeof(int));
         displs = (int *)malloc(nprocs * sizeof(int));
     }
     MPI_Gather(&local_ny, 1, MPI_INT, local_ny_all, 1, MPI_INT, 0, comm);
 
-    // Prepare send buffer (flatten local grid)
+    // Prepare send buffer
     double *sendbuf = (double *)malloc(local_ny * nx * sizeof(double));
     for (int j = 0; j < local_ny; j++) {
         for (int i = 0; i < nx; i++) {
-            sendbuf[j * nx + i] = local_grid[j + 1][i];  // Skip ghost row
+            sendbuf[j * nx + i] = local_grid[j + 1][i]; // Skip ghost row
         }
     }
 
     // Prepare recvcounts and displs on rank 0
-    int recvcount = local_ny * nx;
+    int sendcount = local_ny * nx;
     double *recvbuf = NULL;
     if (rank == 0) {
-        int total_rows = 0;
+        int total = 0;
         for (int p = 0; p < nprocs; p++) {
-            displs[p] = total_rows * nx;
-            total_rows += local_ny_all[p];
+            recvcounts[p] = local_ny_all[p] * nx;
+            displs[p] = total;
+            total += recvcounts[p];
         }
-        recvbuf = (double *)malloc(total_rows * nx * sizeof(double));
+        recvbuf = (double *)malloc(total * sizeof(double));
     }
 
     // Gather data
-    MPI_Gatherv(sendbuf, recvcount, MPI_DOUBLE,
-                recvbuf, local_ny_all, displs, MPI_DOUBLE,
+    MPI_Gatherv(sendbuf, sendcount, MPI_DOUBLE,
+                recvbuf, recvcounts, displs, MPI_DOUBLE,
                 0, comm);
 
     // Reconstruct global grid on rank 0
@@ -100,13 +103,13 @@ void GatherGrid(double **local_grid, int local_ny, int nx, int rank, int nprocs,
             }
         }
         free(local_ny_all);
+        free(recvcounts);
         free(displs);
         free(recvbuf);
     }
 
     free(sendbuf);
 }
-
 
 
 
