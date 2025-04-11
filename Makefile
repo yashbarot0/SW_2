@@ -4,5 +4,8 @@ CFLAGS = -Wall -O2
 poisson: poisson.c
 	$(CC) $(CFLAGS) -o poisson poisson.c
 
+poisson: poisson2.c
+	$(CC) $(CFLAGS) -o poisson2 poisson2.c
+
 clean:
-	rm -f poisson
+	rm -f poisson poisson2
