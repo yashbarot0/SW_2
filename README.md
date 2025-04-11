@@ -9,7 +9,6 @@
 - Verified with rank neighbor printouts
 
 ### Results
-```bash
 $ mpirun -np 4 ./poisson1d
 Rank 0 neighbors: left=-2, right=1
 Rank 1 neighbors: left=0, right=2
