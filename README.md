@@ -23,7 +23,7 @@ Finer grids yield better accuracy as expected.
    - `poisson3.c` (Q3)
    - `plot_heatmap.py` (visualization)
    - `Makefile`
-   - `Report.md`
+   - `heatmap.png`
 
 2. Compile and run:
 ```bash
