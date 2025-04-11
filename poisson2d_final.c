@@ -82,6 +82,54 @@ void exchange_ghosts(double **grid, int nx_local, int ny_local,
     }
 }
 
+
+
+void GatherGrid2D(double **local_grid, int nx_local, int ny_local, 
+    int nx_global, int ny_global, MPI_Comm comm, 
+    int rank, double **global_grid) {
+int dims[2], periods[2], coords[2];
+MPI_Cart_get(comm, 2, dims, periods, coords);
+
+// Each process sends its local data to rank 0
+double *sendbuf = (double*)malloc(nx_local * ny_local * sizeof(double));
+for (int j = 0; j < ny_local; j++) {
+for (int i = 0; i < nx_local; i++) {
+sendbuf[j * nx_local + i] = local_grid[j+1][i+1];  // Skip ghost cells
+}
+}
+
+if (rank == 0) {
+// Receive data from all processes
+int offset = 0;
+for (int src = 0; src < dims[0] * dims[1]; src++) {
+int src_coords[2];
+MPI_Cart_coords(comm, src, 2, src_coords);
+
+// Calculate source process's local size
+int src_nx = (src_coords[0] < (nx_global % dims[0])) ? 
+            (nx_global/dims[0] + 1) : (nx_global/dims[0]);
+int src_ny = (src_coords[1] < (ny_global % dims[1])) ? 
+            (ny_global/dims[1] + 1) : (ny_global/dims[1]);
+
+// Calculate global offsets
+int x_offset = src_coords[0] * (nx_global/dims[0]) + 
+             ((src_coords[0] < (nx_global % dims[0])) ? src_coords[0] : (nx_global % dims[0]));
+int y_offset = src_coords[1] * (ny_global/dims[1]) + 
+             ((src_coords[1] < (ny_global % dims[1])) ? src_coords[1] : (ny_global % dims[1]));
+
+// Receive data directly into global grid
+MPI_Recv(&global_grid[y_offset][x_offset], src_nx * src_ny, MPI_DOUBLE,
+        src, 0, comm, MPI_STATUS_IGNORE);
+}
+} else {
+MPI_Send(sendbuf, nx_local * ny_local, MPI_DOUBLE, 0, 0, comm);
+}
+free(sendbuf);
+}
+
+
+
+
 int main(int argc, char **argv) {
     MPI_Init(&argc, &argv);
     int rank, nprocs;
@@ -157,6 +205,35 @@ int main(int argc, char **argv) {
 
         apply_boundary_conditions(u_old, x_start, y_start, nx_local, ny_local, n, n, h);
     }
+
+
+    // Add output section
+    double **global_solution = NULL;
+    if (rank == 0) {
+        global_solution = (double**)malloc(n * sizeof(double*));
+        for (int i = 0; i < n; i++) {
+            global_solution[i] = (double*)malloc(n * sizeof(double));
+        }
+    }
+
+    // Gather results
+    GatherGrid2D(u_old, nx_local, ny_local, n, n, comm_2d, rank, global_solution);
+
+    // Write output
+    if (rank == 0) {
+        FILE *fp = fopen("output.txt", "w");
+        for (int j = 0; j < n; j++) {
+            for (int i = 0; i < n; i++) {
+                double x = i * h;
+                double y = j * h;
+                double analytic = y / ((1.0 + x)*(1.0 + x) + y*y);
+                fprintf(fp, "%.6f %.6f\n", global_solution[j][i], analytic);
+            }
+        }
+        fclose(fp);
+        printf("Output written to output.txt\n");
+    }
+
 
     // Cleanup
     MPI_Type_free(&column_type);
