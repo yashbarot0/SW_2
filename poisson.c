@@ -1,4 +1,5 @@
 #include <mpi.h>
+#include <stdio.h>
 
 int main(int argc, char **argv) {
     MPI_Init(&argc, &argv);
@@ -6,7 +7,7 @@ int main(int argc, char **argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
-    // Create 1D Cartesian topology
+    // Create 1D Cartesian topology 
     int dims[1] = {0};
     int periods[1] = {0};
     int reorder = 0;
@@ -20,12 +21,9 @@ int main(int argc, char **argv) {
     int left, right;
     MPI_Cart_shift(cart_comm, 0, 1, &left, &right);
 
-    // Example communication using Cartesian neighbors
-    double send_buffer[100], recv_buffer[100];
-    MPI_Status status;
-    MPI_Sendrecv(send_buffer, 100, MPI_DOUBLE, right, 0,
-                 recv_buffer, 100, MPI_DOUBLE, left, 0,
-                 cart_comm, &status);
+    // Print neighbor information
+    printf("Rank %d (World) | Cartesian Rank %d: Left Neighbor = %d, Right Neighbor = %d\n",
+           myid, my_cart_rank, left, right);
 
     MPI_Comm_free(&cart_comm);
     MPI_Finalize();
